@@ -44,7 +44,7 @@ public:
         static_assert(std::is_base_of_v<T, T_>);
         IF_PRESENT(id, map, it)
                 return it.second;
-        return nullptr;
+        return get<T_>(id);
     }
 
     template<typename T_ = T>

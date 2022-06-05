@@ -125,9 +125,12 @@ public:
             StateBufferQueue &q;
             size_t id;
             buffer_list_it_t it;
-            ReadBuffer(StateBufferQueue &q, size_t id) : q(q), id(id), it(q.acquire_read_buffer(id)) {}
         public:
+            ReadBuffer(StateBufferQueue &q, size_t id) : q(q), id(id), it(q.acquire_read_buffer(id)) {}
             ~ReadBuffer() { q.release_read_buffer(id, it); }
+            ReadBuffer(ReadBuffer&&) = default;
+            ReadBuffer(const ReadBuffer&) = delete;
+            ReadBuffer& operator=(const ReadBuffer&) = delete;
             const StateBuffer* operator->() { return &it->second; }
         };
 
@@ -138,6 +141,9 @@ public:
         public:
             WriteBuffer(StateBufferQueue &q) : q(q) {}
             ~WriteBuffer() { q.add_buffer(std::move(buf)); }
+            WriteBuffer(WriteBuffer&&) = default;
+            WriteBuffer(const WriteBuffer&) = delete;
+            ReadBuffer& operator=(const ReadBuffer&) = delete;
             HolderMap_t<T>* operator->() { return &buf; }
         };
 

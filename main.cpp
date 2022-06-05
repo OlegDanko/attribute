@@ -2,9 +2,15 @@
 #include <AttributesList.hpp>
 #include <BookmarkedQueue.hpp>
 #include <StateBufferQueue/StateBufferQueue.hpp>
-#include <StateBufferQueue/ExampleStateBufferQueueMaps.hpp>
-#include <vector>
+#include <StateBufferQueue/ExampleMaps.hpp>
+#include <EventHandling/AttributeEventHandling.hpp>
 
+
+#include <utils/utils.hpp>
+#include <utils/IdInc.hpp>
+
+
+#include <vector>
 #include <iostream>
 #include <type_traits>
 #include <unordered_map>
@@ -13,18 +19,15 @@
 #include <atomic>
 #include <mutex>
 
-#include <utils/utils.hpp>
-#include <utils/IdInc.hpp>
-
 #define COMMENT(X)
 
 COMMENT(
-| id | Transform | KeyController | AIController | MovementApplier | INetObject | Mover | Renderable |
-|    |           |               |              | Input     AI    | OUT   IN   |       |            |
-|----|-----------|---------------|--------------|-----------------|------------|-------|------------|
-| 1  | X         | X             |              | X               | X          | X     | X          | <- Game object controlled by a local client
-| 1  | X         |               | X            |           X     | X          | X     | X          | <- Game object controlled by local simulation
-| 2  | X         |               |              |                 |       X    | X     | X          | <- Game object controlled remotely
+| id | Transform | KeyController     | AIController | MovementApplier | INetObject | Mover | Renderable |
+|    |           | Agent   FreeFloat |              | Input     AI    | OUT   IN   |       |            |
+|----|-----------|-------------------|--------------|-----------------|------------|-------|------------|
+| 1  | X         | X                 |              | X               | X          | X     | X          | <- Game object controlled by a local client
+| 1  | X         |                   | X            |           X     | X          | X     | X          | <- Game object controlled by local simulation
+| 2  | X         |                   |              |                 |       X    | X     | X          | <- Game object controlled remotely
 )
 
 template<typename T, typename...Ts> void test_fn() { test_fn<T>(); test_fn<Ts...>();}
@@ -37,22 +40,6 @@ template<typename...Ts>
 struct test_types<types<Ts...>> {
     static void fn() { test_fn<Ts...>(); }
 };
-
-class KeyController : public Attribute<> {};
-
-class AIController : public Attribute<> {};
-
-class Mover : public Attribute<> {};
-
-class IMovementApplier : public Attribute<> {};
-
-class MovementNetObject : public Attribute<void, types<Mover>> {};
-
-class KeyMovementApplier : public Attribute<IMovementApplier, types<KeyController, Mover, MovementNetObject>> {};
-
-class AIMovementApplier : public Attribute<IMovementApplier, types<AIController, Mover, MovementNetObject>> {};
-
-class Renderable : public Attribute<> {};
 
 struct vec2 {
     float x, y;
@@ -78,19 +65,176 @@ struct vec2 {
     return s << "{" << v.x << ", " << v.y << "}";
 };
 
-struct GameObject {
-    vec2 pos;
-    vec2 dir;
+
+struct vec3 {
+    float x, y, z;
+    void operator +=(const vec3& v) {
+        x += v.x;
+        y += v.y;
+        z += v.z;
+    }
+    vec3 operator +(const vec3& v) const {
+        return {x+v.x, y+v.y, z+v.z};
+    }
+    vec3 operator *(const vec3& v) const {
+        return {x*v.x, y*v.y, z*v.z};
+    }
+    bool operator ==(const vec3& v) const {
+        return x == v.x && y == v.y;
+    }
+    bool operator !=(const vec3& v) const {
+        return !(*this == v);
+    }
 };
 
-using game_state_queue_t = StateBufferQueue<HolderMap, AccessorMap, GameObject>;
-
-struct GameContext {
-    game_state_queue_t game_state_queue;
+::std::ostream& operator<<(::std::ostream& s, vec3 v) {
+    return s << "{" << v.x << ", " << v.y << ", " << v.z << "}";
 };
+
+class Transform : public Attribute<void, types<>> {
+    using base_t = Attribute<void, types<>>;
+    vec3 position;
+    vec3 rotation;
+    vec3 scale;
+
+    Transform(size_t id) : base_t(id) {}
+    Transform(const Transform& that)
+        : base_t(that.get_id())
+        , position(that.position)
+        , rotation(that.rotation)
+        , scale(that.scale) {}
+    Transform(Transform&& that)
+        : base_t(that.get_id())
+        , position(that.position)
+        , rotation(that.rotation)
+        , scale(that.scale) {}
+
+    struct : AttributeEventDispatcher<vec3> {} position_changed_event;
+    void on_position_changed(vec3 val) { position_changed_event.stage(get_id(), val); }
+    struct : AttributeEventDispatcher<vec3> {} rotation_changed_event;
+    void on_rotation_changed(vec3 val) { rotation_changed_event.stage(get_id(), val); }
+    struct : AttributeEventDispatcher<vec3> {} scale_changed_event;
+    void on_scale_changed(vec3 val) { scale_changed_event.stage(get_id(), val); }
+
+
+    void set_position(vec3 val) { position = val; on_position_changed(val); }
+    void set_rotation(vec3 val) { rotation = val; on_rotation_changed(val); }
+    void set_scale(vec3 val) { scale = val; on_scale_changed(val); }
+
+    void position_changed_callback(vec3 val) { set_position(val); }
+    void rotation_changed_callback(vec3 val) { set_rotation(val); }
+    void scale_changed_callback(vec3 val) { set_scale(val); }
+};
+
+class KeyController : public Attribute<> {};
+
+class AIController : public Attribute<> {};
+
+class Mover : public Attribute<> {};
+
+class MovementNetObject : public Attribute<void, types<Mover>> {};
+
+class IMovementApplier : public Attribute<> {};
+
+class KeyMovementApplier : public Attribute<IMovementApplier, types<KeyController, Mover, MovementNetObject>> {};
+
+class AIMovementApplier : public Attribute<IMovementApplier, types<AIController, Mover, MovementNetObject>> {};
+
+class Renderable : public Attribute<> {};
+
+class GameObjectCreator {
+
+};
+
+
+void simple_state_updating_reading_demo();
+void test_attribute_enevt_handling();
+void test_state_buffer_queue();
+void test_Bookmarked_queue();
+void test_event_handling();
+
+int main()
+{
+//    simple_state_updating_reading_demo();
+//    test_attribute_enevt_handling();
+//    test_event_handling();
+//    simple_state_updating_reading_demo();
+//    test_state_buffer_queue();
+//    test_Bookmarked_queue();
+
+    return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void simple_state_updating_reading_demo() {
-    using game_state_queue_t = StateBufferQueue<HolderMap, AccessorMap, GameObject>;
+    struct ExampleGameObject {
+        vec2 pos;
+        vec2 dir;
+    };
+
+    using game_state_queue_t = StateBufferQueue<HolderMap, AccessorMap, ExampleGameObject>;
+
+
+    struct GameContext {
+        game_state_queue_t game_state_queue;
+
+        struct obj_generator : std::enable_shared_from_this<obj_generator> {
+            game_state_queue_t::Client::WriteBuffer wb;
+
+            struct obj_holder {
+                std::shared_ptr<obj_generator> sp;
+                ExampleGameObject* obj;
+                size_t id;
+                ExampleGameObject& operator->(){ return *obj; }
+                ExampleGameObject& operator*(){ return *obj; }
+                ~obj_holder() { std::cout << "deleting obj_holder\n"; }
+            };
+
+            obj_holder gen() {
+                static size_t id = 0;
+                ++id;
+                return {
+                    shared_from_this(),
+                    wb->gen(id),
+                    id
+                };
+            }
+            obj_generator(game_state_queue_t::Client::WriteBuffer wb) : wb(std::move(wb)) {}
+            ~obj_generator() { std::cout << "deleting obj_generator\n"; }
+        };
+        std::shared_ptr<obj_generator> get_generator() {
+            return std::make_shared<obj_generator>(game_state_queue.create_client().get_write_buffer());
+        }
+    };
+
+    using game_state_queue_t = StateBufferQueue<HolderMap, AccessorMap, ExampleGameObject>;
 
     struct PositionUpdate {
         game_state_queue_t::Client q_cli;
@@ -129,72 +273,145 @@ void simple_state_updating_reading_demo() {
             }
         }
     };
-    game_state_queue_t game_state_queue;
 
+    GameContext gc;
     std::vector<size_t> ids;
-    with(auto wb = game_state_queue.create_client().get_write_buffer()) {
-        size_t id = 0;
-        ids.push_back(++id);
-        *wb->gen(ids.back()) = {{10, 10}, {1, 1}};
-        ids.push_back(++id);
-        *wb->gen(ids.back()) = {{-10, -10}, {1, 1}};
+
+
+    with(auto generator = gc.get_generator()) {
+        auto obj = generator->gen();
+        ids.push_back(obj.id);
+        *obj = {{10, 10}, {1, 1}};
+        obj = generator->gen();
+        ids.push_back(obj.id);
+        *obj = {{-10, -10}, {1, 1}};
     }
 
-    PositionUpdate pos_update{game_state_queue, ids};
-    PositionConsumer pos_consume{game_state_queue, ids};
+    PositionUpdate pos_update{gc.game_state_queue, ids};
+    PositionConsumer pos_consume{gc.game_state_queue, ids};
 
     std::atomic_bool running = true;
 
-    std::thread t1([&](){ pos_update.run(running, std::chrono::milliseconds{300});});
-    std::thread t2([&](){ pos_consume.run(running, std::chrono::milliseconds{1000});});
+    std::thread t1([&](){ pos_update.run(running, std::chrono::milliseconds{3});});
+    std::thread t2([&](){ pos_consume.run(running, std::chrono::milliseconds{10});});
 
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
     running = false;
 
     t1.join();
     t2.join();
 }
 
+struct EventProducer {
+    size_t id;
 
-void test_state_buffer_queue();
-void test_Bookmarked_queue();
+    struct : AttributeEventDispatcher<int>{} static event_a;
+    void on_a(int v) { event_a.stage(id, v); }
 
-int main()
-{
-    simple_state_updating_reading_demo();
+    struct : AttributeEventDispatcher<int, double>{} static event_b;
+    void on_b(int v1, double v2) { event_b.stage(id, v1, v2); }
 
-    //test_state_buffer_queue();
-    //test_Bookmarked_queue();
+    static std::vector<ITriggerable*> get_event_sources() { return {&event_a, &event_b}; }
+};
 
-    return 0;
+decltype(EventProducer::event_a) EventProducer::event_a;
+decltype(EventProducer::event_b) EventProducer::event_b;
+
+struct EventConsumer {
+    size_t id;
+    void callback_a(int v) {
+        std::cout << "consumer " << id << " received event a with val " << v << std::endl;
+    }
+    void callback_b(int v_i, double v_d) {
+        std::cout << "consumer " << id << " received event b with vals {" << v_i << ", " << v_d << "}" << std::endl;
+    }
+};
+
+void test_attribute_enevt_handling() {
+    std::unordered_map<size_t, EventProducer> producers;
+    std::unordered_map<size_t, EventConsumer> consumers;
+
+    producers[1] = EventProducer{.id = 1};
+    consumers[1] = EventConsumer{.id = 1};
+    producers[2] = EventProducer{.id = 2};
+    consumers[2] = EventConsumer{.id = 2};
+
+    struct Provider : TypeByIdProvider<EventConsumer>{
+        using map_t = std::unordered_map<size_t, EventConsumer>;
+        map_t& map;
+        Provider(map_t& m) : map(m){}
+        EventConsumer& get(size_t id) override { return map[id]; }
+    };
+    Provider provider{consumers};
+
+
+    std::vector<std::unique_ptr<IListener>> listeners;
+    listeners.push_back(bind_event_listener(EventProducer::event_a, provider, &EventConsumer::callback_a));
+    listeners.push_back(bind_event_listener(EventProducer::event_b, provider, &EventConsumer::callback_b));
+
+    auto flush = [&]() {
+        std::cout << "\n\tNew frame\n";
+        for(auto l : EventProducer::get_event_sources()) l->trigger();
+        for(auto& l : listeners) l->serve_events();
+    };
+
+    producers[1].on_a(10);
+    flush();
+
+    producers[2].on_b(10, 3.14);
+    flush();
+
+
+    producers[1].on_a(10);
+    producers[2].on_a(20);
+    producers[1].on_b(100, 30.14);
+    producers[2].on_b(200, 300.14);
+    flush();
+
 }
 
+void test_event_handling() {
+    struct DemoListener : EventListener<std::string> {
+        size_t id;
+        void serve_event(event_t& e) override {
+            std::cout << "Target: " << id << ", event: " << e.id
+                      << ", msg: " << std::get<0>(e.args) << std::endl;
+        }
+    };
 
+    DemoListener l1;//{.id = 1};
+    l1.id = 1;
+    DemoListener l2;//{.id = 2};
+    l2.id = 2;
 
+    EventDispatcher<std::string> s;
 
+    auto trigger_evs = [&](std::string s1, std::string s2, std::string s3) {
+        s.stage(std::make_shared<Event<std::string>>(1, s1));
+        s.stage(std::make_shared<Event<std::string>>(2, s2));
+        s.stage(std::make_shared<Event<std::string>>(3, s3));
+        s.trigger();
 
+        l1.serve_events();
+        l2.serve_events();
+    };
 
+    trigger_evs("1",
+                "2",
+                "3");
 
+    s.reg_listener(&l1);
 
+    trigger_evs("10",
+                "20",
+                "30");
 
+    s.reg_listener(&l2);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    trigger_evs("100",
+                "200",
+                "300");
+}
 
 void test_state_buffer_queue() {
     struct S{ char c; };
