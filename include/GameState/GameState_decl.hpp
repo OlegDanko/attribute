@@ -29,7 +29,7 @@ struct GS_impl {
     template<typename, typename>
     struct GameStateClient;
 
-    template<typename ...Ts>
+    template<typename T>
     struct GameState;
 
 };

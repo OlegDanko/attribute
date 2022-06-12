@@ -25,14 +25,15 @@ struct AttributeEventDispatcher : EventDispatcher<Args...> {
 
 template<typename T>
 struct TypeByIdProvider {
-    virtual T& get(size_t id) = 0;
+    virtual T* get(size_t id) = 0;
 };
 
 template<typename T, typename ...Args>
 std::unique_ptr<IEventListener> bind_event_listener(EventDispatcher<Args...>& src, TypeByIdProvider<T>& p, void(T::*fn)(Args...)) {
     auto l = std::make_unique<AttributeEventListener<Args...>>();
     l->callback_fn = [&p, fn](size_t id, Args... args){
-        (p.get(id).*fn)(args...);
+        auto ptr = p.get(id);
+        (ptr->*fn)(args...);
     };
     src.reg_listener(l.get());
     return std::move(l);
