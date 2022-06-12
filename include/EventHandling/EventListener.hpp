@@ -9,7 +9,7 @@
 #include <mutex>
 
 template<typename ...Args>
-struct EventListener : IListener{
+struct EventListener : IEventListener{
     using event_t = Event<Args...>;
     std::queue<std::shared_ptr<event_t>> events;
     std::mutex mtx;

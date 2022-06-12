@@ -3,10 +3,11 @@
 #include "TypesHelper.hpp"
 
 class Attribute__ {
-    std::size_t _id;
+protected:
+    std::size_t id;
 public:
-    Attribute__(std::size_t id) : _id(id) {}
-    std::size_t get_id() const;
+    Attribute__(std::size_t id) : id(id) {}
+    std::size_t get_id() const { return id; }
 };
 
 template<typename Base = void, typename Requires = types<>>

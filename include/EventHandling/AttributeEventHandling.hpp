@@ -29,7 +29,7 @@ struct TypeByIdProvider {
 };
 
 template<typename T, typename ...Args>
-std::unique_ptr<IListener> bind_event_listener(EventDispatcher<Args...>& src, TypeByIdProvider<T>& p, void(T::*fn)(Args...)) {
+std::unique_ptr<IEventListener> bind_event_listener(EventDispatcher<Args...>& src, TypeByIdProvider<T>& p, void(T::*fn)(Args...)) {
     auto l = std::make_unique<AttributeEventListener<Args...>>();
     l->callback_fn = [&p, fn](size_t id, Args... args){
         (p.get(id).*fn)(args...);

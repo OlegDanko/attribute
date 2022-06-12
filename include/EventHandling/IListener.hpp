@@ -1,3 +1,6 @@
 #pragma once
 
-struct IListener { virtual void serve_events() = 0; };
+struct IEventListener {
+  virtual ~IEventListener() = default;
+  virtual void serve_events() = 0;
+};

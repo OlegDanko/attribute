@@ -49,6 +49,8 @@ class StateBufferQueue {
         const T_* read(size_t id) const {
             return accessor.template read<T_>(id);
         }
+        const auto begin() const { return accessor.begin(); }
+        const auto end() const { return accessor.end(); }
     };
 
     using buffer_list_item_t = std::pair<std::unordered_set<size_t>, StateBuffer>;
@@ -131,6 +133,7 @@ public:
             ReadBuffer(ReadBuffer&&) = default;
             ReadBuffer(const ReadBuffer&) = delete;
             ReadBuffer& operator=(const ReadBuffer&) = delete;
+            const StateBuffer* operator*() { return &it->second; }
             const StateBuffer* operator->() { return &it->second; }
         };
 
