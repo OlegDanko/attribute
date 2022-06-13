@@ -49,8 +49,8 @@ class StateBufferQueue {
         const T_* read(size_t id) const {
             return accessor.template read<T_>(id);
         }
-        const auto begin() const { return accessor.begin(); }
-        const auto end() const { return accessor.end(); }
+        auto begin() const { return accessor.begin(); }
+        auto end() const { return accessor.end(); }
     };
 
     using buffer_list_item_t = std::pair<std::unordered_set<size_t>, StateBuffer>;
@@ -148,6 +148,7 @@ public:
             WriteBuffer(const WriteBuffer&) = delete;
             ReadBuffer& operator=(const ReadBuffer&) = delete;
             HolderMap_t<T>* operator->() { return &buf; }
+            HolderMap_t<T>* operator*() { return &buf; }
         };
 
         Client(StateBufferQueue &q) : q(q), id(ids.get_next()) {}

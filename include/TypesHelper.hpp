@@ -22,15 +22,12 @@ struct cat_types<types<Ts1...>, types<Ts2...>> {
 
 template<typename, size_t>
 struct types_tail;
-
-
 template<typename T, typename ... Ts, size_t I>
 struct types_tail<types<T, Ts...>, I> {
     using types_ = typename std::conditional<I == 0,
                                              types<T, Ts...>,
                                              typename types_tail<types<Ts...>, I - 1>::types_>::type;
 };
-
 template<size_t I>
 struct types_tail<types<>, I> {
     using types_ = types<>;
@@ -53,11 +50,21 @@ struct type_apply<T, types<Ts...>> {
 
 template<typename, typename...>
 struct is_unique;
-template<typename T1, typename T2>
-struct is_unique<T1, T2> { static constexpr bool val = (!std::is_same<T1, T2>::value); };
-template<typename T1, typename T2, typename ...Ts>
-struct is_unique<T1, T2, Ts...> { static constexpr bool val = (!std::is_same<T1, T2>::value) && is_unique<T1, Ts...>::val; };
+template<typename T>
+struct is_unique<T> { static constexpr bool val = false; };
+template<typename T, typename T1, typename ...Ts>
+struct is_unique<T, T1, Ts...> { static constexpr bool val = (!std::is_same<T, T1>::value) && is_unique<T, Ts...>::val; };
+template<typename T, typename... Ts>
+static constexpr bool is_unique_v = is_unique<T, Ts...>::val;
 
+template<typename, typename...>
+struct is_present;
+template<typename T>
+struct is_present<T> { static constexpr bool val = false; };
+template<typename T, typename T1, typename ...Ts>
+struct is_present<T, T1, Ts...> { static constexpr bool val = (std::is_same<T, T1>::value) || is_present<T, Ts...>::val; };
+template<typename T, typename... Ts>
+static constexpr bool is_present_v = is_present<T, Ts...>::val;
 
 template<typename ... Ts>
 struct unique_types;
@@ -86,8 +93,8 @@ struct size_ {
 
 template<typename T, typename ...Ts>
 struct index_of;
-template<typename T, typename T1>
-struct index_of<T, T1> {
+template<typename T>
+struct index_of<T> {
     static constexpr size_t i = 0;
 };
 template<typename T, typename T1, typename ...Ts>
