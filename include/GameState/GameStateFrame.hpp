@@ -38,6 +38,8 @@ public:
             : frame(frame)
             , id(id) {}
 
+        size_t get_id() const { return id; }
+
         template<typename T>
         T* get_attr() {
             if constexpr(!is_present_v<T, RW...>)

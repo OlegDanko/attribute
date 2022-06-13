@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Event.hpp"
 #include "IListener.hpp"
 
 #include <utils/utils.hpp>
@@ -9,12 +8,12 @@
 #include <mutex>
 
 template<typename ...Args>
-struct EventListener : IEventListener{
+struct EventListenerQueue : IEventListener<Args...>, IEventServer {
     using event_t = Event<Args...>;
     std::queue<std::shared_ptr<event_t>> events;
     std::mutex mtx;
 
-    void notify(std::shared_ptr<event_t> e) {
+    void notify(std::shared_ptr<event_t> e) override {
         with(std::lock_guard lk(mtx)) {
             events.push(std::move(e));
         }
@@ -34,3 +33,20 @@ struct EventListener : IEventListener{
         }
     }
 };
+
+struct IEventListenerHolder {};
+
+template<typename ...Args>
+struct EventListenerInstant : IEventListener<Args...>, IEventListenerHolder {
+    using event_t = Event<Args...>;
+    std::mutex mtx;
+
+    void notify(std::shared_ptr<event_t> e) override {
+        with(std::lock_guard lk(mtx)) {
+            serve_event(*e);
+        }
+    }
+
+    virtual void serve_event(event_t& e) = 0;
+};
+
