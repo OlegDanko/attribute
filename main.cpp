@@ -5,6 +5,8 @@
 #include <StateBufferQueue/ExampleMaps.hpp>
 #include <EventHandling/AttributeEventHandling.hpp>
 
+#include <StateFrameQueue/StateFrame.hpp>
+
 
 #include <utils/utils.hpp>
 #include <utils/IdInc.hpp>
@@ -147,14 +149,178 @@ class GameObjectCreator {
 };
 
 
-void simple_state_updating_reading_demo();
-void test_attribute_enevt_handling();
-void test_state_buffer_queue();
-void test_Bookmarked_queue();
-void test_event_handling();
+//void simple_state_updating_reading_demo();
+//void test_attribute_enevt_handling();
+//void test_state_buffer_queue();
+//void test_Bookmarked_queue();
+//void test_event_handling();
+
+
+
+template<typename T>
+struct IStateFrameUpdateReceiver {
+    public:
+    virtual void set_update(FrameDataUpdate<T>, bool gen) = 0;
+};
+
+template<typename T>
+struct IStateFrameObservatory {
+    public:
+    virtual const FrameDataReder<T>& observe(size_t) = 0;
+    virtual void unobserve(size_t) = 0;
+};
+
+
+template<typename T>
+struct GameStateQueue : IStateFrameUpdateReceiver<T>, IStateFrameObservatory<T> {
+    std::unique_ptr<StateFrame<T>> top_frame;
+    std::unordered_map<size_t, StateFrame<T>*> observed_map;
+    std::mutex mtx;
+
+public:
+
+    const FrameDataState<T>& get_state() {
+        std::lock_guard lk(mtx);
+        return top_frame->get_state();
+    }
+
+    GameStateQueue() : top_frame(std::make_unique<StateFrame<T>>()) {}
+
+    const FrameDataReder<T>& observe(size_t id) override {
+        std::lock_guard lk(mtx);
+        observed_map[id] = top_frame.get();
+        top_frame->observe(id);
+        return top_frame->get_state();
+    }
+    void unobserve(size_t id) override {
+        std::lock_guard lk(mtx);
+        IF_PRESENT(id, observed_map, it) {
+            it->second->unobserve(id);
+            observed_map.erase(it);
+            return;
+        }
+        throw std::logic_error("No frame observed by id " + std::to_string(id) + " found");
+    }
+
+    class ReadFrameProvider {
+        size_t id;
+        IStateFrameObservatory<T>& observatory;
+
+        struct FrameDataHolder {
+            size_t id;
+            IStateFrameObservatory<T>& observatory;
+            const FrameDataReder<T>& data;
+            FrameDataHolder(size_t id,
+                            IStateFrameObservatory<T>& observatory)
+                : id(id)
+                , observatory(observatory)
+                , data(observatory.observe(id)) {}
+            ~FrameDataHolder() {
+                observatory.unobserve(id);
+            }
+
+            const FrameDataReder<T>* operator->() { return &data; }
+        };
+    public:
+        ReadFrameProvider(size_t id,
+                          IStateFrameObservatory<T>& observatory)
+            : id(id)
+            , observatory(observatory) {}
+        FrameDataHolder get() { return { id, observatory }; }
+    };
+    ReadFrameProvider get_read_provider() {  static size_t ids = 0; return {++ids, *this}; }
+
+
+    void set_update(FrameDataUpdate<T> upd, bool gen) override {
+        std::lock_guard lk(mtx);
+        top_frame = std::make_unique<StateFrame<T>>(std::move(top_frame), std::move(upd), gen);
+    }
+
+    class GenFrameProvider {
+        IStateFrameUpdateReceiver<T>& upd_receiver;
+    public:
+        class FrameDataHolder {
+            IStateFrameUpdateReceiver<T>& upd_receiver;
+            FrameDataUpdate<T> updates;
+        public:
+            FrameDataHolder(IStateFrameUpdateReceiver<T>& receiver) : upd_receiver(receiver) {}
+            ~FrameDataHolder() { upd_receiver.set_update(std::move(updates), true); }
+            FrameDataUpdate<T>* operator->() { return &updates; }
+        };
+        GenFrameProvider(IStateFrameUpdateReceiver<T>& receiver) : upd_receiver(receiver) {}
+        FrameDataHolder get() { return {upd_receiver}; }
+    };
+
+    GenFrameProvider get_gen_provider() {  return {*this}; }
+
+    class ModFrameProvider {
+        GameStateQueue& queue;
+    public:
+        class FrameDataHolder {
+            GameStateQueue<T>& queue;
+            FrameDataModifier<T> updates;
+        public:
+            FrameDataHolder(GameStateQueue<T>& queue)
+                : queue(queue)
+                , updates(queue.get_state())
+            {}
+            ~FrameDataHolder() { queue.set_update(std::move(updates.take_updates()), false); }
+            FrameDataModifier<T>* operator->() { return &updates; }
+        };
+        ModFrameProvider(GameStateQueue<T>& queue) : queue(queue) {}
+        FrameDataHolder get() { return {queue}; }
+    };
+
+    ModFrameProvider get_mod_provider() {  return {*this}; }
+
+
+};
 
 int main()
 {
+    GameStateQueue<int> gameStateQueue;
+
+    auto reader = gameStateQueue.get_read_provider();
+    auto generator = gameStateQueue.get_gen_provider();
+    auto modifier = gameStateQueue.get_mod_provider();
+
+    auto read_all = [&reader]{
+        with(auto data_holder = reader.get()) {
+            std::cout << "Reading:\n";
+            data_holder->read_serve([](auto id, const auto& T){
+                std::cout << id << " - " << T << "\n";
+            });
+        }
+    };
+
+    with(auto frame_holder = generator.get()) {
+        *frame_holder->gen(1) = 10;
+        read_all();
+    }
+
+    read_all();
+    with(auto frame_holder = modifier.get()) {
+        *frame_holder->get(1) = 20;
+        read_all();
+    }
+    read_all();
+
+    with(auto frame_holder = modifier.get()) {
+        with(auto frame_holder = generator.get()) {
+            *frame_holder->gen(2) = 100;
+        }
+        *frame_holder->get(1) = 30;
+    }
+    read_all();
+    with(auto frame_holder = generator.get()) {
+        with(auto frame_holder = modifier.get()) {
+            *frame_holder->get(1) = 40;
+        }
+        *frame_holder->gen(3) = 1000;
+    }
+    read_all();
+
+
 //    simple_state_updating_reading_demo();
 //    test_attribute_enevt_handling();
 //    test_event_handling();
@@ -192,7 +358,7 @@ int main()
 
 
 
-
+/*
 void simple_state_updating_reading_demo() {
     struct ExampleGameObject {
         vec2 pos;
@@ -502,4 +668,4 @@ void test_Bookmarked_queue() {
     t1.join();
     t2.join();
 }
-
+*/

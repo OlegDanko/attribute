@@ -14,6 +14,7 @@ class StateBufferQueue {
     class StateBuffer {
         friend class StateBufferQueue;
 
+        size_t id;
         HolderMap_t<T> holder;
         AccessorMap_t<T> accessor;
 
@@ -34,9 +35,8 @@ class StateBufferQueue {
         static constexpr void check_type() {
             static_assert(std::is_base_of_v<T, T_>, "Attempting to read object of unrelated type");
         }
-
     public:
-        StateBuffer() = default;
+        StateBuffer(size_t id) : id(id) {}
         StateBuffer(StateBuffer&&) = default;
         StateBuffer(const StateBuffer&) = delete;
         explicit StateBuffer(HolderMap_t<T>&& h) : holder(std::move(h)) {}

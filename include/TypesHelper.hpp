@@ -45,7 +45,7 @@ struct type_apply<T> {
 };
 template<template<typename> typename T, typename ...Ts>
 struct type_apply<T, types<Ts...>> {
-    using types_ = type_apply<T, Ts...>::types_;
+    using types_ = typename type_apply<T, Ts...>::types_;
 };
 
 template<typename, typename...>
