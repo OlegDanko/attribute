@@ -1,29 +1,27 @@
 #pragma once
 
 #include "GameState_decl.hpp"
-#include "GameStateClient.hpp"
 #include "GameStateClientsCollector.hpp"
 
-template<template<typename> typename H, template<typename> typename A>
 template<typename ...Ts>
-struct GS_impl<H, A>::GameState<types<Ts...>> {
-    using state_queue_tpl_t = typename type_apply<AttrStateQueue, Ts...>::types_::tpl;
-    state_queue_tpl_t state_queues_tpl;
+struct GameState {
+    using queue_t = typename type_apply<StateFrameQueue, Ts...>::types_::tpl;
+    queue_t queues;
 
-    template<typename RW, typename RO>
-    GameStateClient<RW, RO> get_client() {
-        return GameStateClient<RW, RO>(
-                    clients_collector<RW, types<Ts...>>::get(state_queues_tpl),
-                    clients_collector<RO, types<Ts...>>::get(state_queues_tpl)
-                    );
+    GameState(types<Ts...> = types<Ts...>()) {}
+
+    using all_types = types<Ts...>;
+
+    template<typename Types = all_types>
+    auto get_gen_clients() {
+        return clients_collector<Types, types<Ts...>>::collect_gen(queues);
     }
-
-    auto get_client() {
-        return get_client<types<Ts...>, types<>>();
+    template<typename Types = all_types>
+    auto get_mod_clients() {
+        return clients_collector<Types, types<Ts...>>::collect_mod(queues);
     }
-
-    template<typename CLIENT>
-    auto get_client() {
-        return get_client<typename CLIENT::RW_t, typename CLIENT::RO_t>();
+    template<typename Types = all_types>
+    auto get_read_clients() {
+        return clients_collector<Types, types<Ts...>>::collect_read(queues);
     }
 };

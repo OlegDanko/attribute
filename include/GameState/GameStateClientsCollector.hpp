@@ -2,27 +2,51 @@
 
 #include "GameState_decl.hpp"
 
-template<template<typename> typename H, template<typename> typename A>
 template<typename ...QTs>
-struct GS_impl<H, A>::clients_collector<types<>, types<QTs...>> {
-    using queue_tpl_t = typename type_apply<AttrStateQueue, QTs...>::types_::tpl;
-
-    static constexpr std::tuple<> get(queue_tpl_t& queue_tpl) {
-        return {};
-    };
+struct clients_collector<types<>, types<QTs...>> {
+    using queue_t = typename type_apply<StateFrameQueue, QTs...>::types_::tpl;
+    static auto collect_gen(queue_t& q) {
+        return std::tuple<>();
+    }
+    static auto collect_mod(queue_t& q) {
+        return std::tuple<>();
+    }
+    static auto collect_read(queue_t& q) {
+        return std::tuple<>();
+    }
 };
 
-template<template<typename> typename H, template<typename> typename A>
-template<typename CT, typename ...CTs, typename ...QTs>
-struct GS_impl<H, A>::clients_collector<types<CT, CTs...>, types<QTs...>> {
-    using clients_tpl_t = typename type_apply<AttrClient, CT, CTs...>::types_::tpl;
-    using queue_tpl_t = typename type_apply<AttrStateQueue, QTs...>::types_::tpl;
+template<typename T, typename ...QTs>
+struct clients_collector<types<T>, types<QTs...>> {
+    using queue_t = typename type_apply<StateFrameQueue, QTs...>::types_::tpl;
+    static auto collect_gen(queue_t& q) {
+        return std::make_tuple(std::get<index_of_v<T, QTs...>>(q).get_gen_provider());
+    }
+    static auto collect_mod(queue_t& q) {
+        return std::make_tuple(std::get<index_of_v<T, QTs...>>(q).get_mod_provider());
+    }
+    static auto collect_read(queue_t& q) {
+        return std::make_tuple(std::get<index_of_v<T, QTs...>>(q).get_read_provider());
+    }
+};
 
-    using sub_collector_t = clients_collector<types<CTs...>, types<QTs...>>;
+template<typename T, typename ...Ts, typename ...QTs>
+struct clients_collector<types<T, Ts...>, types<QTs...>> {
+    using queue_t = typename type_apply<StateFrameQueue, QTs...>::types_::tpl;
+    using head_t = types<T>;
+    using tail_t = types<Ts...>;
+    using q_t = types<QTs...>;
 
-    static constexpr clients_tpl_t get(queue_tpl_t& queue_tpl) {
-        return std::tuple_cat(
-            std::tuple(std::get<index_of<CT, QTs...>::i>(queue_tpl).create_client()),
-            sub_collector_t::get(queue_tpl));
-    };
+    static auto collect_gen(queue_t& q) {
+        return std::tuple_cat(clients_collector<head_t, q_t>::collect_gen(q),
+                              clients_collector<tail_t, q_t>::collect_gen(q));
+    }
+    static auto collect_mod(queue_t& q) {
+        return std::tuple_cat(clients_collector<head_t, q_t>::collect_mod(q),
+                              clients_collector<tail_t, q_t>::collect_mod(q));
+    }
+    static auto collect_read(queue_t& q) {
+        return std::tuple_cat(clients_collector<head_t, q_t>::collect_read(q),
+                              clients_collector<tail_t, q_t>::collect_read(q));
+    }
 };

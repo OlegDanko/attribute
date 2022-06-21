@@ -14,15 +14,20 @@ template<typename T>
 class FrameDataUpdater {
 public:
     virtual T* gen(size_t) = 0;
+    virtual T* get(size_t) = 0;
     virtual void remove(size_t) = 0;
 };
 
 template<typename T>
-class FrameDataUpdate : FrameDataUpdater<T> {
+class FrameDataUpdate : public FrameDataUpdater<T> {
     friend class FrameDataState<T>;
     std::unordered_map<size_t, std::unique_ptr<T>> u_ptr_map;
     std::unordered_set<size_t> remove_set;
 public:
+    FrameDataUpdate() = default;
+    FrameDataUpdate(FrameDataUpdate&&) = default;
+    FrameDataUpdate(const FrameDataUpdate&) = delete;
+
     void merge_from(FrameDataUpdate& from) {
         for(auto r = remove_set.begin(); r != remove_set.end(); ) {
             IF_PRESENT(*r, from.u_ptr_map, it) {
@@ -47,12 +52,6 @@ public:
         }
     }
 
-    T* get(size_t id) {
-        IF_PRESENT(id, u_ptr_map, it)
-                return it->second.get();
-        return nullptr;
-    }
-
     T* gen(size_t id, const T& ref) {
         auto u_ptr = std::make_unique<T>(ref);
         auto ptr = u_ptr.get();
@@ -61,10 +60,16 @@ public:
     }
     // FrameDataUpdater
     T* gen(size_t id) override {
-        auto u_ptr = std::make_unique<T>();
+        auto u_ptr = std::make_unique<T>(id);
         auto ptr = u_ptr.get();
         u_ptr_map[id] = std::move(u_ptr);
         return ptr;
+    }
+
+    T* get(size_t id) override {
+        IF_PRESENT(id, u_ptr_map, it)
+                return it->second.get();
+        return nullptr;
     }
 
     void remove(size_t id) override {
@@ -112,6 +117,10 @@ public:
     }
 };
 
+enum ReadType {
+    NEWEST,
+    OLDEST
+};
 
 template<typename T>
 class FrameDataModifier {
@@ -126,6 +135,19 @@ public:
             return update.gen(id, *ptr);
         return nullptr;
     }
+    template<ReadType rt = OLDEST>
+    const T* read(size_t id) const {
+        if constexpr(rt == NEWEST) {
+            if(auto ptr = update.get(id); ptr)
+                return ptr;
+        }
+        return state.read(id);
+    }
+
+    void read_serve(std::function<void(size_t, const T&)> fn) const {
+        state.read_serve(fn);
+    }
+
     FrameDataUpdate<T> take_updates() { return std::move(update); }
 };
 

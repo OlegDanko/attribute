@@ -86,7 +86,7 @@ class StateBufferQueue {
 
     void release_read_buffer(size_t id, buffer_list_it_t buf_it) {
         std::lock_guard lk(mtx);
-        buf_it->first.erase(id);
+        buf_it->first.erase(id); // TODO: I'm crashing
 
         if(!is_free(buf_it))
             return;

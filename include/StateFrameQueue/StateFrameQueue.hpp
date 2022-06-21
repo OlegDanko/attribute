@@ -38,11 +38,13 @@ public:
     class ReadFrameProvider {
         size_t id;
         StateFrameQueue& observatory;
-
+    public:
         struct FrameDataHolder {
             size_t id;
             StateFrameQueue& observatory;
             const FrameDataReder<T>& data;
+            FrameDataHolder(FrameDataHolder&&) = delete;
+            FrameDataHolder(const FrameDataHolder&) = delete;
             FrameDataHolder(size_t id,
                             StateFrameQueue& observatory)
                 : id(id)
@@ -54,12 +56,11 @@ public:
 
             const FrameDataReder<T>* operator->() { return &data; }
         };
-    public:
         ReadFrameProvider(size_t id,
                           StateFrameQueue& observatory)
             : id(id)
             , observatory(observatory) {}
-        FrameDataHolder get() { return { id, observatory }; }
+        std::unique_ptr<FrameDataHolder> get() { return std::make_unique<FrameDataHolder>(id, observatory); }
     };
     ReadFrameProvider get_read_provider() {  static size_t ids = 0; return {++ids, *this}; }
 
@@ -76,12 +77,14 @@ public:
             StateFrameQueue& upd_receiver;
             FrameDataUpdate<T> updates;
         public:
+            FrameDataHolder(FrameDataHolder&&) = delete;
+            FrameDataHolder(const FrameDataHolder&) = delete;
             FrameDataHolder(StateFrameQueue& receiver) : upd_receiver(receiver) {}
             ~FrameDataHolder() { upd_receiver.set_update(std::move(updates), true); }
-            FrameDataUpdate<T>* operator->() { return &updates; }
+            FrameDataUpdater<T>* operator->() { return &updates; }
         };
         GenFrameProvider(StateFrameQueue& receiver) : upd_receiver(receiver) {}
-        FrameDataHolder get() { return {upd_receiver}; }
+        std::unique_ptr<FrameDataHolder> get() { return std::make_unique<FrameDataHolder>(upd_receiver); }
     };
 
     GenFrameProvider get_gen_provider() {  return {*this}; }
@@ -93,6 +96,8 @@ public:
             StateFrameQueue<T>& queue;
             FrameDataModifier<T> updates;
         public:
+            FrameDataHolder(FrameDataHolder&&) = delete;
+            FrameDataHolder(const FrameDataHolder&) = delete;
             FrameDataHolder(StateFrameQueue<T>& queue)
                 : queue(queue)
                 , updates(queue.get_state())
@@ -101,7 +106,7 @@ public:
             FrameDataModifier<T>* operator->() { return &updates; }
         };
         ModFrameProvider(StateFrameQueue<T>& queue) : queue(queue) {}
-        FrameDataHolder get() { return {queue}; }
+        std::unique_ptr<FrameDataHolder> get() { return std::make_unique<FrameDataHolder>(queue); }
     };
 
     ModFrameProvider get_mod_provider() {  return {*this}; }

@@ -25,7 +25,7 @@ public:
         }
 
         for(auto& [id, obj] : from.map)
-            map[id] = std::move(obj);
+            map.emplace(std::pair<size_t, std::unique_ptr<T>>(id, std::move(obj)));
     }
 
     template<typename T_ = T>
@@ -35,7 +35,7 @@ public:
                 removed.erase(it);
         auto u_ptr = std::make_unique<T_>(id);
         auto ptr = u_ptr.get();
-        map[id] = std::move(u_ptr);
+        map.emplace(std::pair<size_t, std::unique_ptr<T>>(id, std::move(u_ptr)));
         return ptr;
     }
 
@@ -43,7 +43,7 @@ public:
     T_* gen(const T_& prev) {
         auto u_ptr = std::make_unique<T_>(prev);
         auto ptr = u_ptr.get();
-        map[prev.get_id()] = std::move(u_ptr);
+        map.emplace(std::pair<size_t, std::unique_ptr<T>>(prev.get_id(), std::move(u_ptr)));
         return ptr;
     }
 
