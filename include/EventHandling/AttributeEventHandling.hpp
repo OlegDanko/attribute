@@ -20,7 +20,7 @@ struct AttributeEventDispatcher : EventDispatcher<Args...> {
     void stage(size_t id, Args&...args) {
         base_t::stage(std::make_shared<event_t>(id, std::make_tuple(args...)));
     }
-    void fire(size_t id, Args&...args) {
+    void fire(size_t id, const Args&...args) {
         base_t::fire(std::make_shared<event_t>(id, std::make_tuple(args...)));
     }
 };
