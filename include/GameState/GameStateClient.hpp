@@ -89,12 +89,22 @@ struct GameStateClient<types<MOD...>, types<READ...>> {
     auto get_frame() { return Frame(mod_clients, read_clients); }
 };
 
+template<typename>
+struct GameStateGenClient;
+
+
+struct game_object_id {
+    static size_t id;
+    static size_t get() { return ++id; }
+};
+size_t game_object_id::id{0};
+
 template<typename ...GEN>
-struct GameStateGenClient {
+struct GameStateGenClient<types<GEN...>> {
     using gen_clients_t = typename type_apply<GenFrameProvider, GEN...>::types_::tpl;
     gen_clients_t gen_clients;
 
-    GameStateGenClient(GameState<GEN...>& gs) : gen_clients(std::move(gs.get_gen_clients())) {}
+    GameStateGenClient(GameState<types<GEN...>>& gs) : gen_clients(std::move(gs.get_gen_clients())) {}
 
     struct Frame {
         decltype(collect_frames(gen_clients)) gen_frames;
@@ -102,7 +112,6 @@ struct GameStateGenClient {
         Frame(gen_clients_t& gen_clients)
             : gen_frames(std::move(collect_frames(gen_clients))) {}
 
-        size_t get_id() { static size_t ids = 0; return ++ids; }
 
         template<typename T>
         T* get(size_t id) {
@@ -145,9 +154,23 @@ struct GameStateGenClient {
 
         template<typename ...Ts>
         GameObject gen(types<Ts...> = types<Ts...>()) {
-            auto id = get_id();
+            auto id = game_object_id::get();
             generator<Ts...>::gen(id, gen_frames);
             return {*this, id};
+        }
+    };
+
+    struct IPrototypeGen {
+        virtual typename Frame::GameObject generate(GameStateGenClient<types<GEN...>>::Frame&) = 0;
+    };
+
+    template<typename ...Ts>
+    struct PrototypeGen {
+        PrototypeGen() = default;
+        template<typename ...Attrs>
+        PrototypeGen(types<Attrs...>) {}
+        typename Frame::GameObject generate(GameStateGenClient<types<GEN...>>::Frame& frame) override {
+            return frame.template gen<Ts...>();
         }
     };
 
@@ -155,3 +178,4 @@ struct GameStateGenClient {
         return Frame{gen_clients};
     }
 };
+

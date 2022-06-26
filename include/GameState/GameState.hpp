@@ -3,8 +3,11 @@
 #include "GameState_decl.hpp"
 #include "GameStateClientsCollector.hpp"
 
+template<typename>
+struct GameState;
+
 template<typename ...Ts>
-struct GameState {
+struct GameState<types<Ts...>> {
     using queue_t = typename type_apply<StateFrameQueue, Ts...>::types_::tpl;
     queue_t queues;
 
