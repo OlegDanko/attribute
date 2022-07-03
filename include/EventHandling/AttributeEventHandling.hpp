@@ -26,7 +26,7 @@ struct AttributeEventDispatcher : EventDispatcher<Args...> {
 };
 
 template<typename T>
-struct TypeByIdProvider {
+struct ITypeByIdProvider {
     virtual T* get(size_t id) = 0;
 };
 
