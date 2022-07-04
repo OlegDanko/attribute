@@ -162,8 +162,8 @@ struct GameStateGenClient<types<GEN...>> {
         template<typename T, typename ...Ts>
         struct generator<T, Ts...> {
             static void gen(size_t id, decltype(gen_frames)& frames, gen_listeners_map_t& ls) {
-                generator<T>::gen(id, frames);
-                generator<Ts...>::gen(id, frames);
+                generator<T>::gen(id, frames, ls);
+                generator<Ts...>::gen(id, frames, ls);
             }
         };
 
