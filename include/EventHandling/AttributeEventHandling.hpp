@@ -1,6 +1,5 @@
 #pragma once
 
-#include "EventListener.hpp"
 #include "EventDispatcher.hpp"
 
 template<template<typename ...>typename EL_base, typename ...Args>
@@ -8,7 +7,7 @@ struct AttributeEventListener : EL_base<Args...> {
     using fn_t = std::function<void(size_t, Args...)>;
     fn_t callback_fn;
 
-    void serve_event(typename EventListenerQueue<Args...>::event_t& e) override {
+    void serve_event(typename EL_base<Args...>::event_t& e) override {
         std::apply(callback_fn, std::tuple_cat(std::make_tuple(e.id), e.args));
     }
 };
