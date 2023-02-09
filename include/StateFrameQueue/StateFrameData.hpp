@@ -81,14 +81,18 @@ public:
 
 template<typename T>
 class FrameDataReder {
+    using ptr_map_t = std::unordered_map<size_t, T*>;
+    using ptr_map_citer_t = typename ptr_map_t::const_iterator;
 public:
     virtual T* read(size_t) const = 0;
-    virtual void read_serve(std::function<void(size_t, const T&)>) const = 0;
+    virtual std::pair<ptr_map_citer_t, ptr_map_citer_t> const_iter_range() const = 0;
 };
 
 template<typename T>
 class FrameDataState : public FrameDataReder<T> {
-    std::unordered_map<size_t, T*> ptr_map;
+    using ptr_map_t = std::unordered_map<size_t, T*>;
+    using ptr_map_citer_t = typename ptr_map_t::const_iterator;
+    ptr_map_t ptr_map;
 public:
     FrameDataState() = default;
     FrameDataState(const FrameDataState& state, const FrameDataUpdate<T>& upd)
@@ -110,10 +114,8 @@ public:
                 return it->second;
         return nullptr;
     }
-    void read_serve(std::function<void(size_t, const T&)> fn) const override {
-        for(auto [id, ptr] : ptr_map) {
-            fn(id, *ptr);
-        }
+    std::pair<ptr_map_citer_t, ptr_map_citer_t> const_iter_range() const override {
+        return {ptr_map.begin(), ptr_map.end()};
     }
 };
 
@@ -144,8 +146,8 @@ public:
         return state.read(id);
     }
 
-    void read_serve(std::function<void(size_t, const T&)> fn) const {
-        state.read_serve(fn);
+    auto const_iter_range() const {
+        return state.const_iter_range();
     }
 
     FrameDataUpdate<T> take_updates() { return std::move(update); }

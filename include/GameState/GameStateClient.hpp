@@ -71,16 +71,40 @@ struct GameStateClient<types<MOD...>, types<READ...>> {
 
         GameObject get(size_t id) { return {*this, id}; }
 
-        template<typename T>
-        void serve_game_objects(std::function<void(GameObject)> fn) {
-            if constexpr (is_present_v<T, MOD...>) {
-                return (*std::get<index_of_v<T, MOD...>>(mod_frames))->read_serve(
-                            [this, fn](auto id, const auto&){ fn(get(id)); });
-            }
+        template<typename attr_it>
+        class go_citer {
+            Frame& frame;
+            attr_it it;
+        public:
+            go_citer(Frame& f, attr_it i) : frame(f), it(i) {}
+            auto operator*() { return frame.get(it->first); }
+            void operator++() { it++; }
+            bool operator==(const go_citer& that) const { return it == that.it; }
+            bool operator!=(const go_citer& that) const { return !(*this == that); }
+        };
 
+        template<typename attr_it>
+        std::pair<go_citer<attr_it>, go_citer<attr_it>>
+        go_citers_from_attr_citers(attr_it begin, attr_it end) {
+            return {
+                go_citer<attr_it>{*this, begin},
+                go_citer<attr_it>{*this, end}
+            };
+        }
+
+        template<typename T>
+        auto iterate_game_objects() {
+            if constexpr (is_present_v<T, MOD...>) {
+                auto [begin, end] = (*std::get<index_of_v<T, MOD...>>(mod_frames))
+                        ->const_iter_range();
+                auto [b, e] = go_citers_from_attr_citers(begin, end);
+                return utl_prf::iterable(b, e);
+            }
             if constexpr (is_present_v<T, READ...>) {
-                return (*std::get<index_of_v<T, READ...>>(read_frames))->read_serve(
-                            [this, fn](auto id, const auto&){ fn(get(id)); });
+                auto [begin, end] = (*std::get<index_of_v<T, READ...>>(read_frames))
+                        ->const_iter_range();
+                auto [b, e] = go_citers_from_attr_citers(begin, end);
+                return utl_prf::iterable(b, e);
             }
         }
 
