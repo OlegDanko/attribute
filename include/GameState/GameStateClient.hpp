@@ -116,11 +116,7 @@ struct GameStateClient<types<MOD...>, types<READ...>> {
 template<typename>
 struct GameStateGenClient;
 
-struct game_object_id {
-    static size_t id;
-    static size_t get() { return ++id; }
-};
-size_t game_object_id::id{0};
+size_t get_next_game_object_id();
 
 class IObjectGenListener {
 public:
@@ -193,7 +189,7 @@ struct GameStateGenClient<types<GEN...>> {
 
         template<typename ...Ts>
         GameObject gen(types<Ts...> = types<Ts...>()) {
-            auto id = game_object_id::get();
+            auto id = get_next_game_object_id();
             generator<Ts...>::gen(id, gen_frames, gen_listeners);
             return {*this, id};
         }
