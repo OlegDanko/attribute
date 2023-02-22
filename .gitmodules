@@ -1,3 +1,3 @@
 [submodule "deps/utils"]
 	path = deps/utils
-	url = /home/oldanko/projects/gamedev/utility/utils/
+	url = git@bitbucket.org:Oldanko/utils.git
