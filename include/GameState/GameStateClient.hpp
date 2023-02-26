@@ -162,6 +162,7 @@ struct GameStateGenClient<types<GEN...>> {
         GameObject gen(types<Ts...> = types<Ts...>()) {
             auto id = get_next_game_object_id();
             (gen_<Ts>(id),...);
+            gen_listeners.template on_generated<Ts...>(id);
             return {*this, id};
         }
     };
