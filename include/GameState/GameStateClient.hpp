@@ -4,44 +4,33 @@
 #include "GameState.hpp"
 #include "IObjectGenListener.hpp"
 
-template<typename T, size_t I = 0>
-auto collect_frames(T& clients) {
-    if constexpr (std::tuple_size_v<T> == 0)
-            return std::tuple<>();
-    else if constexpr (I+1 == std::tuple_size_v<T>)
-            return std::make_tuple(std::get<I>(clients).get());
-    else
-        return std::tuple_cat(std::make_tuple(std::get<I>(clients).get()),
-                              collect_frames<T, I+1>(clients));
-}
-
 template<typename ...MOD, typename ... READ>
 struct GameStateClient<types<MOD...>, types<READ...>> {
-    using mod_clients_t = typename type_apply<ModFrameProvider, MOD...>::types_::tpl;
-    using read_clients_t = typename type_apply<ReadFrameProvider, READ...>::types_::tpl;
+    using mod_clients_t = FrameProviders<ModFrameProvider, MOD...>;
+    using read_clients_t = FrameProviders<ReadFrameProvider, READ...>;
     mod_clients_t mod_clients;
     read_clients_t read_clients;
 
     template<typename ...Ts>
     GameStateClient(GameState<Ts...>& gs)
-        : mod_clients(gs.template get_mod_clients<types<MOD...>>())
-        , read_clients(gs.template get_read_clients<types<READ...>>()) {}
+        : mod_clients(gs.template get_mod_providers<MOD...>())
+        , read_clients(gs.template get_read_providers<READ...>()) {}
 
     struct Frame {
-        decltype(collect_frames(mod_clients)) mod_frames;
-        decltype(collect_frames(read_clients)) read_frames;
+        SubTypesChain<ModFrameDataHolder_ptr_t, MOD...> mod_frames;
+        SubTypesChain<ReadFrameDataHolder_ptr_t, READ...> read_frames;
 
         Frame(mod_clients_t& mod_clients, read_clients_t& read_clients)
-            : mod_frames(std::move(collect_frames(mod_clients)))
-            , read_frames(std::move(collect_frames(read_clients))) {}
+            : mod_frames(mod_clients.get_frames())
+            , read_frames(read_clients.get_frames()) {}
 
         template<typename T>
         const T* read(size_t id) const {
             if constexpr (is_present_v<T, MOD...>) {
-                return (*std::get<index_of_v<T, MOD...>>(mod_frames))->read(id);
+                return (*mod_frames.template get<T>())->read(id);
             }
             else if constexpr (is_present_v<T, READ...>) {
-                return (*std::get<index_of_v<T, READ...>>(read_frames))->read(id);
+                return (*read_frames.template get<T>())->read(id);
             }
             return nullptr;
         }
@@ -49,7 +38,7 @@ struct GameStateClient<types<MOD...>, types<READ...>> {
         template<typename T>
         T* get(size_t id) {
             if constexpr (is_present_v<T, MOD...>) {
-                return (*std::get<index_of_v<T, MOD...>>(mod_frames))->get(id);
+                return (*mod_frames.template get<T>())->get(id);
             }
             return nullptr;
         }
@@ -96,13 +85,13 @@ struct GameStateClient<types<MOD...>, types<READ...>> {
         template<typename T>
         auto iterate_game_objects() {
             if constexpr (is_present_v<T, MOD...>) {
-                auto [begin, end] = (*std::get<index_of_v<T, MOD...>>(mod_frames))
+                auto [begin, end] = (*mod_frames.template get<T>())
                         ->const_iter_range();
                 auto [b, e] = go_citers_from_attr_citers(begin, end);
                 return utl_prf::iterable(b, e);
             }
             if constexpr (is_present_v<T, READ...>) {
-                auto [begin, end] = (*std::get<index_of_v<T, READ...>>(read_frames))
+                auto [begin, end] = (*read_frames.template get<T>())
                         ->const_iter_range();
                 auto [b, e] = go_citers_from_attr_citers(begin, end);
                 return utl_prf::iterable(b, e);
@@ -121,35 +110,32 @@ size_t get_next_game_object_id();
 
 template<typename ...GEN>
 struct GameStateGenClient<types<GEN...>> {
-    using gen_clients_t = typename type_apply<GenFrameProvider, GEN...>::types_::tpl;
+    using gen_clients_t = FrameProviders<GenFrameProvider, GEN...>;
     gen_clients_t gen_clients;
 
-//    using gen_listeners_map_t = std::unordered_map<size_t, std::vector<IObjectGenListener*>>;
-//    gen_listeners_map_t gen_listeners;
     using listeners_register_t = ObjectGenListenerRegister<GEN...>;
     listeners_register_t gen_listeners;
 
     template<typename T>
     void add_listener(IObjectGenListener<T>* l) {
         gen_listeners.add(l);
-//        gen_listeners[typeid(T).hash_code()].push_back(l);
     }
 
     GameStateGenClient(GameState<types<GEN...>>& gs)
-        : gen_clients(std::move(gs.get_gen_clients())) {}
+        : gen_clients(gs.get_gen_providers()) {}
 
     struct Frame {
-        decltype(collect_frames(gen_clients)) gen_frames;
+        SubTypesChain<GenFrameDataHolder_ptr_t, GEN...> gen_frames;
         listeners_register_t& gen_listeners;
 
         Frame(gen_clients_t& gen_clients, listeners_register_t& gen_listeners)
-            : gen_frames(std::move(collect_frames(gen_clients)))
+            : gen_frames(gen_clients.get_frames())
             , gen_listeners(gen_listeners) {}
 
         template<typename T>
         T* get(size_t id) {
             if constexpr (is_present_v<T, GEN...>) {
-                return (*std::get<index_of_v<T, GEN...>>(gen_frames))->get(id);
+                return (*gen_frames.template get<T>())->get(id);
             }
             return nullptr;
         }
@@ -167,30 +153,15 @@ struct GameStateGenClient<types<GEN...>> {
             }
         };
 
-        template<typename...>
-        struct generator;
-
         template<typename T>
-        struct generator<T> {
-            static void gen(size_t id, decltype(gen_frames)& frames, listeners_register_t& ls) {
-                (*std::get<index_of_v<T, GEN...>>(frames))->gen(id);
-//                for(auto l : ls[typeid(T).hash_code()]) l->on_game_object_created(id);
-            }
-        };
-
-        template<typename T, typename ...Ts>
-        struct generator<T, Ts...> {
-            static void gen(size_t id, decltype(gen_frames)& frames, listeners_register_t& ls) {
-                generator<T>::gen(id, frames, ls);
-                generator<Ts...>::gen(id, frames, ls);
-            }
-        };
+        void gen_(size_t id) {
+            (*gen_frames.template get<T>())->gen(id);
+        }
 
         template<typename ...Ts>
         GameObject gen(types<Ts...> = types<Ts...>()) {
             auto id = get_next_game_object_id();
-            generator<Ts...>::gen(id, gen_frames, gen_listeners);
-            gen_listeners.template on_generated<Ts...>(id);
+            (gen_<Ts>(id),...);
             return {*this, id};
         }
     };
