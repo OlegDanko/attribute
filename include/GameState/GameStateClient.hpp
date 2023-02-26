@@ -167,22 +167,6 @@ struct GameStateGenClient<types<GEN...>> {
         }
     };
 
-    struct IPrototypeGen {
-        virtual typename Frame::GameObject
-        generate(GameStateGenClient<types<GEN...>>::Frame&) = 0;
-    };
-
-    template<typename ...Ts>
-    struct PrototypeGen {
-        PrototypeGen() = default;
-        template<typename ...Attrs>
-        PrototypeGen(types<Attrs...>) {}
-        typename Frame::GameObject
-        generate(GameStateGenClient<types<GEN...>>::Frame& frame) override {
-            return frame.template gen<Ts...>();
-        }
-    };
-
     auto get_frame() {
         return Frame{gen_clients, gen_listeners};
     }
