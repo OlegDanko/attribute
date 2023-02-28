@@ -1,8 +1,12 @@
 #pragma once
 
-#include "GameState_decl.hpp"
 #include "GameState.hpp"
 #include "IObjectGenListener.hpp"
+
+template<typename, typename>
+struct GameStateClient;
+
+using utl_prf::is_type_present_v;
 
 template<typename ...MOD, typename ... READ>
 struct GameStateClient<types<MOD...>, types<READ...>> {
@@ -26,10 +30,10 @@ struct GameStateClient<types<MOD...>, types<READ...>> {
 
         template<typename T>
         const T* read(size_t id) const {
-            if constexpr (is_present_v<T, MOD...>) {
+            if constexpr (is_type_present_v<T, MOD...>) {
                 return (*mod_frames.template get<T>())->read(id);
             }
-            else if constexpr (is_present_v<T, READ...>) {
+            else if constexpr (is_type_present_v<T, READ...>) {
                 return (*read_frames.template get<T>())->read(id);
             }
             return nullptr;
@@ -37,7 +41,7 @@ struct GameStateClient<types<MOD...>, types<READ...>> {
 
         template<typename T>
         T* get(size_t id) {
-            if constexpr (is_present_v<T, MOD...>) {
+            if constexpr (is_type_present_v<T, MOD...>) {
                 return (*mod_frames.template get<T>())->get(id);
             }
             return nullptr;
@@ -84,13 +88,13 @@ struct GameStateClient<types<MOD...>, types<READ...>> {
 
         template<typename T>
         auto iterate_game_objects() {
-            if constexpr (is_present_v<T, MOD...>) {
+            if constexpr (is_type_present_v<T, MOD...>) {
                 auto [begin, end] = (*mod_frames.template get<T>())
                         ->const_iter_range();
                 auto [b, e] = go_citers_from_attr_citers(begin, end);
                 return utl_prf::iterable(b, e);
             }
-            if constexpr (is_present_v<T, READ...>) {
+            if constexpr (is_type_present_v<T, READ...>) {
                 auto [begin, end] = (*read_frames.template get<T>())
                         ->const_iter_range();
                 auto [b, e] = go_citers_from_attr_citers(begin, end);
@@ -134,7 +138,7 @@ struct GameStateGenClient<types<GEN...>> {
 
         template<typename T>
         T* get(size_t id) {
-            if constexpr (is_present_v<T, GEN...>) {
+            if constexpr (is_type_present_v<T, GEN...>) {
                 return (*gen_frames.template get<T>())->get(id);
             }
             return nullptr;

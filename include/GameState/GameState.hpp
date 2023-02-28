@@ -1,7 +1,10 @@
 #pragma once
 
-#include "GameState_decl.hpp"
-#include <TypesChain.hpp>
+#include <utils/types/TypesChain.hpp>
+#include "StateFrameQueue/StateFrameQueue.hpp"
+
+using utl_prf::types;
+using utl_prf::SubTypesChain;
 
 template<typename ...Ts>
 using queues_t = SubTypesChain<StateFrameQueue, Ts...>;
@@ -27,13 +30,13 @@ struct FrameProviders : SubTypesChain<PVD, Ts...> {
 
     auto get_frames() {
         if constexpr (pvd_helper::is_gen) {
-            return make_subtypes_chain<GenFrameDataHolder_ptr_t>(
+            return utl_prf::make_subtypes_chain<GenFrameDataHolder_ptr_t>(
                         this->template get<Ts>().get()...);
         } else if constexpr (pvd_helper::is_mod) {
-            return make_subtypes_chain<ModFrameDataHolder_ptr_t>(
+            return utl_prf::make_subtypes_chain<ModFrameDataHolder_ptr_t>(
                         this->template get<Ts>().get()...);
         } else if constexpr (pvd_helper::is_read) {
-            return make_subtypes_chain<ReadFrameDataHolder_ptr_t>(
+            return utl_prf::make_subtypes_chain<ReadFrameDataHolder_ptr_t>(
                         this->template get<Ts>().get()...);
         }
     }
@@ -43,7 +46,7 @@ private:
 
     template<typename ...Qs>
     auto gen_base(queues_t<Qs...>& q) {
-        return make_subtypes_chain<PVD>(get_provider<Ts>(q)...);
+        return utl_prf::make_subtypes_chain<PVD>(get_provider<Ts>(q)...);
     }
 
     template<typename T, typename ...Qs>

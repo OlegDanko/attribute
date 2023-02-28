@@ -16,7 +16,29 @@
 template<typename T>
 using u_ptr = std::unique_ptr<ModFrameDataHolder<T>>;
 
+template <typename T>
+struct Struct
+{
+    Struct() {}
+};
+
+using utl_prf::index_of_type_v;
+using utl_prf::unique_types;
+
 int main() {
+    SubTypesChain<Struct, int> chain;
+
+    using types_t = unique_types<int, float, double, char, float, int>::types_;
+    using types_2 = unique_types<int, types<float, double, char, float, int>>::types_;
+
+//    static_assert(std::is_same_v<types_t, types_2>);
+
+    std::cout << "int is in position " << index_of_type_v<int, types_t> << std::endl;
+    std::cout << "float is in position " << index_of_type_v<float, types_t> << std::endl;
+    std::cout << "double is in posistion " << index_of_type_v<double, types_t> << std::endl;
+    std::cout << "char is in position " << index_of_type_v<char, types_t> << std::endl;
+//    std::cout << "char is in position " << index_of_v<std::string, types_t> << std::endl;
+
     GameState<types<int, double>> gs;
     auto mod_providers = gs.get_mod_providers<int>();
     auto mod_frames = mod_providers.get_frames();

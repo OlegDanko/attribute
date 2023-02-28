@@ -1,30 +1,18 @@
 #pragma once
-#include "StateFrameQueue/StateFrameData.hpp"
-#include <memory>
-#include <stdexcept>
-#include <iostream>
-
-struct ID {
-    static size_t get() {
-        static size_t id = 0;
-        return ++id;
-    }
-};
+#include "FrameData.hpp"
 
 template<typename T>
 class StateFrame {
     std::unique_ptr<StateFrame> prev{nullptr};
     StateFrame* next{nullptr};
 
-    StateFrameData<T> data;
+    FrameData<T> data;
     bool is_gen{false};
 
     std::unordered_set<size_t> observers;
 
     bool is_ready_to_merge() {
-        auto a = !is_gen;
-        auto b = observers.empty();
-        return a && b;
+        return !is_gen && observers.empty();
     }
 
     void try_merge_prev() {
@@ -77,7 +65,7 @@ public:
         try_merge_prev();
     }
 
-    const StateFrameData<T>& observe(size_t id) {
+    const FrameData<T>& observe(size_t id) {
         observers.insert(id);
         return data;
     }
